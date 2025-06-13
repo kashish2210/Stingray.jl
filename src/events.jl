@@ -1,9 +1,14 @@
 """
-$(TYPEDEF)
+    FITSMetadata{H}
 
 Metadata associated with a FITS or events file.
 
-$(TYPEDFIELDS)
+# Fields
+- `filepath::String`: Path to the FITS file
+- `hdu::Int`: HDU index that the metadata was read from
+- `energy_units::Union{Nothing,String}`: Units of energy (column name: ENERGY, PI, or PHA)
+- `extra_columns::Dict{String,Vector}`: Extra columns that were requested during read
+- `headers::H`: FITS headers from the selected HDU
 
 # Examples
 ```julia
@@ -34,11 +39,14 @@ function Base.show(io::IO, ::MIME"text/plain", m::FITSMetadata)
 end
 
 """
-$(TYPEDEF)
+    EventList{TimeType, MetaType <: FITSMetadata}
 
 Container for an events list storing times, energies, and associated metadata.
 
-$(TYPEDFIELDS)
+# Fields
+- `times::TimeType`: Vector with recorded times
+- `energies::Union{Nothing,TimeType}`: Vector with recorded energies (or `nothing` if no energy data)
+- `meta::MetaType`: Metadata from FITS file
 
 # Constructors
 ```julia
@@ -56,9 +64,24 @@ ev = EventList([1.0, 2.0, 3.0])  # times only
 - `energies(ev)`: Access energies vector (may be `nothing`)
 - `has_energies(ev)`: Check if energies are present
 
-Generally should not be directly constructed, but read from file using [`readevents`](@ref).
+# Filtering
+EventList supports composable filtering operations:
+```julia
+# Filter by time (in-place)
+filter_time!(t -> t > 100.0, ev)
 
-See also: [`filter_time!`](@ref), [`filter_energy!`](@ref) for filtering operations.
+# Filter by energy (in-place)  
+filter_energy!(energy_val -> energy_val < 10.0, ev)
+
+# Non-mutating versions
+ev_filtered = filter_time(t -> t > 100.0, ev)
+ev_filtered = filter_energy(energy_val -> energy_val < 10.0, ev)
+
+# Composable filtering
+filter_energy!(x -> x < 10.0, filter_time!(t -> t > 100.0, ev))
+```
+
+Generally should not be directly constructed, but read from file using [`readevents`](@ref).
 """
 struct EventList{TimeType<:AbstractVector,MetaType<:FITSMetadata}
     "Vector with recorded times"
@@ -173,18 +196,22 @@ has_energies(ev::EventList) = !isnothing(ev.energies)
 # ============================================================================
 
 """
-$(TYPEDSIGNATURES)
+    filter_time!(f, ev::EventList)
 
 Filter all columns of the EventList based on a predicate `f` applied to the times. 
 Modifies the EventList in-place for efficiency.
 
-Returns the modified EventList (for chaining operations).
+# Arguments
+- `f`: Predicate function that takes a time value and returns a Boolean
+- `ev::EventList`: EventList to filter (modified in-place)
 
-# Filtering Operations
-EventList supports composable filtering operations:
+# Returns
+The modified EventList (for chaining operations)
+
+# Examples
 ```julia
-# Filter by time (in-place)
-filter_time!(t -> t > 100.0, ev)
+# Filter only positive times
+filter_time!(t -> t > 0, ev)
 
 # Filter times greater than some minimum using function composition
 min_time = 100.0
@@ -192,9 +219,6 @@ filter_time!(x -> x > min_time, ev)
 
 # Chaining filters
 filter_energy!(x -> x < 10.0, filter_time!(t -> t > 100.0, ev))
-
-# Non-mutating version
-ev_filtered = filter_time(t -> t > 100.0, ev)
 ```
 
 See also [`filter_energy!`](@ref), [`filter_time`](@ref).
@@ -202,16 +226,19 @@ See also [`filter_energy!`](@ref), [`filter_time`](@ref).
 filter_time!(f, ev::EventList) = filter_on!(f, ev.times, ev)
 
 """
-$(TYPEDSIGNATURES)
+    filter_energy!(f, ev::EventList)
 
 Filter all columns of the EventList based on a predicate `f` applied to the energies. 
 Modifies the EventList in-place for efficiency.
 
-Returns the modified EventList (for chaining operations).
+# Arguments
+- `f`: Predicate function that takes an energy value and returns a Boolean
+- `ev::EventList`: EventList to filter (modified in-place)
+
+# Returns
+The modified EventList (for chaining operations)
 
 # Examples
-# Filtering Operations  
-EventList supports composable filtering operations:
 ```julia
 # Filter energies less than 10 keV
 filter_energy!(energy_val -> energy_val < 10.0, ev)
@@ -222,9 +249,6 @@ filter_energy!(x -> x < max_energy, ev)
 
 # Chaining with time filter
 filter_energy!(x -> x < 10.0, filter_time!(t -> t > 100.0, ev))
-
-# Non-mutating version
-ev_filtered = filter_energy(energy_val -> energy_val < 10.0, ev)
 ```
 
 # Throws
@@ -448,16 +472,16 @@ function read_energy_column(
 
     # Get actual column names from the file
     all_cols = FITSIO.colnames(hdu)
-
+    
     for col_name in energy_alternatives
         # Find matching column name (case-insensitive)
         actual_col = findfirst(col -> uppercase(col) == uppercase(col_name), all_cols)
-
+        
         if !isnothing(actual_col)
             actual_col_name = all_cols[actual_col]
             try
                 # Use the actual column name from the file
-                data = read(hdu, actual_col_name, case_sensitive = false)
+                data = read(hdu, actual_col_name, case_sensitive=false)
                 return actual_col_name, convert(Vector{T}, data)
             catch
                 # If this column exists but can't be read, try the next one
@@ -550,7 +574,7 @@ function readevents(
 
         # Get actual column names to find the correct TIME column
         all_cols = FITSIO.colnames(selected_hdu)
-        time = convert(Vector{T}, read(selected_hdu, "TIME", case_sensitive = false))
+        time = convert(Vector{T}, read(selected_hdu, "TIME", case_sensitive=false))
 
         # Read energy column using separated function
         energy_column, energy = read_energy_column(
@@ -563,12 +587,10 @@ function readevents(
         extra_data = Dict{String,Vector}()
         for col_name in extra_columns
             # Find actual column name (case-insensitive)
-            actual_col_idx =
-                findfirst(col -> uppercase(col) == uppercase(col_name), all_cols)
+            actual_col_idx = findfirst(col -> uppercase(col) == uppercase(col_name), all_cols)
             if !isnothing(actual_col_idx)
                 actual_col_name = all_cols[actual_col_idx]
-                extra_data[col_name] =
-                    read(selected_hdu, actual_col_name, case_sensitive = false)
+                extra_data[col_name] = read(selected_hdu, actual_col_name, case_sensitive=false)
             else
                 @warn "Column '$col_name' not found in FITS file"
             end
