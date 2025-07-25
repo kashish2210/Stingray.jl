@@ -77,6 +77,6 @@ export create_filtered_lightcurve
 export check_gtis
 export split_by_gtis
 
-include("recipes.jl")
+include("plots_recipes.jl")
 
 end
