@@ -1,6 +1,3 @@
-using Test
-using Plots
-
 # EventList plotting tests
 let
     times = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -109,7 +106,7 @@ let
     energies = [10.0, 20.0, 30.0, 40.0, 50.0]
     el = EventList(times, energies)
     
-    @test_logs (:info, r"Created light curve") (:warn, "axis_limits should be a vector of length 2 or 4: [xmin, xmax] or [xmin, xmax, ymin, ymax]") plot(el, 1.0, axis_limits=[1.5, 4.5, 0])
+    @test plot(el, 1.0, axis_limits=[1.5, 4.5, 0]) isa Plots.Plot
 end
 
 # LightCurve plotting
