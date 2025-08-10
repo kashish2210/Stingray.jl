@@ -1,18 +1,47 @@
+#wrapper to avoid recpies conflicts
 struct BTIAnalysisPlot{T}
     eventlist::EventList{T}
 end
+
 """
-    f(events::EventList{T}; bti_analysis=false, nbins=30, min_length=1e-3, max_length=10000.0, xlims_range=nothing, ylims_range=nothing) where T
+    btianalysis(events::EventList{T}) -> BTIAnalysisPlot{T}
 
-Create a histogram plot of Bad Time Interval (BTI) lengths from an EventList.
+Create a BTIAnalysisPlot object that can be plotted to show Bad Time Interval (BTI) length distribution.
 
-This recipe function analyzes the distribution of bad time intervals by extracting Good Time Intervals (GTIs)
-from the event metadata and computing the complementary BTIs. It generates a logarithmic histogram showing
-the frequency distribution of BTI durations.
+This function creates a plottable object that analyzes the distribution of bad time intervals by extracting 
+Good Time Intervals (GTIs) from the event metadata and computing the complementary BTIs. When plotted, it 
+generates a logarithmic histogram showing the frequency distribution of BTI durations.
 
 # Arguments
 - `events::EventList{T}`: The input event list containing timing data and GTI metadata
-- `bti_analysis::Bool=false`: Enable BTI analysis (function returns `nothing` if `false`)
+
+# Returns
+- `BTIAnalysisPlot{T}`: A plottable object containing the event list data
+
+# Usage
+The returned object can be plotted using the standard `plot()` function with various customization options:
+
+```julia
+# Basic BTI analysis plot
+bti_plot = btianalysis(events)
+plot(bti_plot, bti_analysis=true)
+
+# Custom binning and axis limits  
+plot(bti_plot, bti_analysis=true, nbins=50, xlims_range=(1e-4, 1e4))
+
+# Analysis with custom y-axis range
+plot(bti_plot, bti_analysis=true, ylims_range=(1, 1000))
+```
+
+---
+
+    plot(bti_plot::BTIAnalysisPlot{T}; bti_analysis=false, nbins=30, min_length=1e-3, max_length=10000.0, xlims_range=nothing, ylims_range=nothing) where T
+
+Plot a histogram of Bad Time Interval (BTI) lengths from a BTIAnalysisPlot object.
+
+# Plot Arguments
+- `bti_plot::BTIAnalysisPlot{T}`: The BTI analysis object created by `btianalysis()`
+- `bti_analysis::Bool=false`: Enable BTI analysis (plot returns `nothing` if `false`)
 - `nbins::Int=30`: Number of histogram bins for the distribution plot
 - `min_length::Float64=1e-3`: Minimum BTI length threshold (currently unused in filtering)
 - `max_length::Float64=10000.0`: Maximum BTI length threshold (currently unused in filtering)  
@@ -37,24 +66,43 @@ the frequency distribution of BTI durations.
 - Steel blue fill color with transparency
 - Grid enabled for easier reading
 
-# Examples
+# Complete Examples
 ```julia
-# Basic BTI analysis
 using Plots
-plots(events=readevents("your_file"), bti_analysis=true)
 
-# Custom binning and axis limits  
-plots(events, bti_analysis=true, nbins=50, xlims_range=(1e-4, 1e4))
+# Read event data
+events = readevents("your_file.fits")
 
-# Analysis with custom y-axis range
-plots(events, bti_analysis=true, ylims_range=(1, 1000))
+# Create BTI analysis object and plot
+bti_plot = btianalysis(events)
+plot(bti_plot, bti_analysis=true)
+
+# Customized analysis with specific parameters
+plot(bti_plot, 
+     bti_analysis=true, 
+     nbins=50, 
+     xlims_range=(1e-4, 1e4),
+     ylims_range=(1, 1000))
+
+# Save the plot
+savefig("bti_analysis.png")
 ```
+
+# Workflow
+1. Create EventList with GTI metadata: `events = readevents("file")`
+2. Create BTI analysis object: `bti_plot = btianalysis(events)`
+3. Generate plot: `plot(bti_plot, bti_analysis=true)`
 
 # Notes
 - Requires GTI information in `events.meta.gti` to function properly
 - Short BTIs (< 1.0 second) are tracked separately in diagnostic output
 - Function includes extensive error handling for missing or invalid GTI data
+- The `bti_analysis=true` parameter must be set to generate the actual analysis plot
 """
+
+# Constructor function (typically defined elsewhere)
+btianalysis(events::EventList{T}) where T = BTIAnalysisPlot(events)
+
 @recipe function f(events::BTIAnalysisPlot{T}; 
                   bti_analysis=false,
                   nbins=30,
@@ -162,8 +210,6 @@ plots(events, bti_analysis=true, ylims_range=(1, 1000))
     println("Total exposure: $(total_exposure)")
     println("Total BTI length: $(total_bti_length)")
     println("Total BTI length (short BTIs): $(total_short_bti_length)")
-    
-    # THIS IS THE KEY FIX - Use the same logic as your working function
     data_min, data_max = 0.0, 1.0
     try
         data_min = minimum(bti_lengths)
