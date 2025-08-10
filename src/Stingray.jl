@@ -79,5 +79,6 @@ export split_by_gtis
 
 include("plotting/plots_recipes_lightcurve.jl")
 export create_segments
-
+include("plotting/plots_recipes_gti.jl")
+export BTIAnalysisPlot
 end

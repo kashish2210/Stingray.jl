@@ -20,4 +20,5 @@ end
 
 @testset "recipes" begin
     include("test_plotting/test_plots_recipes_lightcurve.jl")
+    include("test_plotting/test_plots_recipes_gti.jl")
 end
