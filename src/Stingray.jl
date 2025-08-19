@@ -76,4 +76,14 @@ export create_filtered_lightcurve
 export check_gtis
 export split_by_gtis
 
+include("crossspectrum.jl")
+export Crossspectrum
+export AveragedCrossspectrum
+export get_flux_generator
+export coherence
+export normalize_crossspectrum
+export cospectra_pvalue
+export time_lag
+
+
 end
